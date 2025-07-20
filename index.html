@@ -107,6 +107,7 @@
                 <input type="file" id="taskImage" accept="image/*">
             </div>
             <button class="btn" onclick="solveTask()">🚀 Решить задачу</button>
+            <button class="btn" onclick="closeApp()" style="margin-top: 10px; background: #6c757d;">❌ Закрыть</button>
         </div>
 
         <div class="status" id="status"></div>
@@ -141,13 +142,42 @@
             showStatus('🤔 Обрабатываю задачу...', 'success');
 
             try {
-                // Здесь будет API запрос к бэкенду
-                // Пока что просто демонстрация
-                setTimeout(() => {
-                    showStatus('✅ Задача успешно отправлена! Ответ будет в боте.', 'success');
-                }, 2000);
+                // Получаем данные пользователя из Telegram
+                const tgUser = tg.initDataUnsafe?.user;
+                if (!tgUser) {
+                    throw new Error('Не удалось получить данные пользователя');
+                }
+
+                // Создаем FormData для отправки файла
+                const formData = new FormData();
+                formData.append('telegram_id', tgUser.id);
+                formData.append('description', taskText);
+                
+                if (taskImage) {
+                    formData.append('image', taskImage);
+                }
+
+                // Отправляем задачу на API
+                const response = await fetch('http://localhost:8002/api/tasks/create/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showStatus('✅ Задача успешно отправлена! ID: ' + result.id, 'success');
+                    
+                    // Закрываем WebApp и возвращаемся в бота
+                    setTimeout(() => {
+                        tg.close();
+                    }, 3000);
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Ошибка сервера');
+                }
 
             } catch (error) {
+                console.error('Error:', error);
                 showStatus('❌ Ошибка при отправке задачи: ' + error.message, 'error');
             }
         }
@@ -163,6 +193,11 @@
                     status.style.display = 'none';
                 }, 5000);
             }
+        }
+
+        // Функция закрытия приложения
+        function closeApp() {
+            tg.close();
         }
 
         // Обработка файлов
