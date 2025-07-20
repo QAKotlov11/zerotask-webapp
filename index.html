@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroTask - Решение задач</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .task-form {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--tg-theme-hint-color, #ccc);
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .btn {
+            background: var(--tg-theme-button-color, #0088cc);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn:hover {
+            opacity: 0.9;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .user-info {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 ZeroTask</h1>
+            <p>AI-помощник для решения задач</p>
+        </div>
+
+        <div class="user-info" id="userInfo">
+            Загрузка информации о пользователе...
+        </div>
+
+        <div class="task-form">
+            <h3>📝 Отправь задачу</h3>
+            <div class="form-group">
+                <label for="taskText">Текст задачи:</label>
+                <textarea id="taskText" placeholder="Опиши задачу подробно..."></textarea>
+            </div>
+            <div class="form-group">
+                <label for="taskImage">Или загрузи фото:</label>
+                <input type="file" id="taskImage" accept="image/*">
+            </div>
+            <button class="btn" onclick="solveTask()">🚀 Решить задачу</button>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        // Инициализация Telegram WebApp
+        let tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+
+        // Получение информации о пользователе
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            document.getElementById('userInfo').innerHTML = `
+                👤 <strong>${user.first_name}</strong>
+                ${user.username ? `(@${user.username})` : ''}
+                <br>🆔 ID: ${user.id}
+            `;
+        }
+
+        // Функция решения задачи
+        async function solveTask() {
+            const taskText = document.getElementById('taskText').value;
+            const taskImage = document.getElementById('taskImage').files[0];
+            
+            if (!taskText && !taskImage) {
+                showStatus('Пожалуйста, введите текст задачи или загрузите фото', 'error');
+                return;
+            }
+
+            showStatus('🤔 Обрабатываю задачу...', 'success');
+
+            try {
+                // Здесь будет API запрос к бэкенду
+                // Пока что просто демонстрация
+                setTimeout(() => {
+                    showStatus('✅ Задача успешно отправлена! Ответ будет в боте.', 'success');
+                }, 2000);
+
+            } catch (error) {
+                showStatus('❌ Ошибка при отправке задачи: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    status.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Обработка файлов
+        document.getElementById('taskImage').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                showStatus(`📷 Фото загружено: ${file.name}`, 'success');
+            }
+        });
+    </script>
+</body>
+</html> 
