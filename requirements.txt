@@ -1,0 +1,20 @@
+# Django и REST Framework
+Django>=5.2.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+
+# Telegram Bot
+python-telegram-bot>=20.0
+
+# OpenAI
+openai>=1.0.0
+
+# HTTP клиент
+httpx>=0.25.0
+
+# Утилиты
+python-dotenv>=1.0.0
+Pillow>=10.0.0
+
+# Разработка
+django-debug-toolbar>=4.2.0
