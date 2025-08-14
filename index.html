@@ -2,20 +2,82 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ZeroTask - Решение задач</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background: var(--tg-theme-bg-color, #ffffff);
             color: var(--tg-theme-text-color, #000000);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* Мобильные стили */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                max-width: 100%;
+                padding: 0 10px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+                margin-bottom: 10px;
+            }
+            
+            .header p {
+                font-size: 16px;
+            }
+            
+            .task-form, .task-result {
+                padding: 15px;
+                margin-bottom: 15px;
+            }
+            
+            .btn {
+                padding: 15px 20px;
+                font-size: 18px;
+                margin-bottom: 10px;
+            }
+            
+            .nav-buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .nav-buttons .btn {
+                width: 100%;
+            }
         }
         .container {
             max-width: 600px;
             margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* WebApp специфичные стили */
+        .webapp-container {
+            background: var(--tg-theme-bg-color, #ffffff);
+            min-height: 100vh;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+        
+        /* Стили для безопасной зоны */
+        @supports (padding: max(0px)) {
+            .webapp-container {
+                padding-left: max(env(safe-area-inset-left), 20px);
+                padding-right: max(env(safe-area-inset-right), 20px);
+                padding-top: max(env(safe-area-inset-top), 20px);
+                padding-bottom: max(env(safe-area-inset-bottom), 20px);
+            }
         }
         .header {
             text-align: center;
@@ -41,11 +103,9 @@
             border: 1px solid var(--tg-theme-hint-color, #ccc);
             border-radius: 8px;
             font-size: 16px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
             box-sizing: border-box;
-        }
-        textarea {
-            height: 100px;
-            resize: vertical;
         }
         .btn {
             background: var(--tg-theme-button-color, #0088cc);
@@ -55,26 +115,37 @@
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
-            width: 100%;
+            transition: opacity 0.2s;
         }
         .btn:hover {
-            opacity: 0.9;
+            opacity: 0.8;
         }
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: none;
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .task-result {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 20px;
         }
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .spinner {
+            border: 4px solid var(--tg-theme-hint-color, #f3f3f3);
+            border-top: 4px solid var(--tg-theme-button-color, #0088cc);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         .user-info {
             background: var(--tg-theme-secondary-bg-color, #f5f5f5);
@@ -83,130 +154,484 @@
             margin-bottom: 20px;
             font-size: 14px;
         }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .nav-buttons .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+        .image-preview {
+            margin: 10px 0;
+            text-align: center;
+        }
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 8px;
+            border: 2px solid var(--tg-theme-hint-color, #ccc);
+        }
+        .remove-image {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-top: 5px;
+            cursor: pointer;
+        }
+        .screen {
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+        .task-list {
+            margin-top: 20px;
+        }
+        .task-item {
+            background: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .task-item:hover {
+            background: var(--tg-theme-hint-color, #e0e0e0);
+        }
+        .task-item h4 {
+            margin: 0 0 10px 0;
+            color: var(--tg-theme-text-color, #000000);
+        }
+        .task-item p {
+            margin: 0;
+            color: var(--tg-theme-hint-color, #666);
+            font-size: 14px;
+        }
+        .back-btn {
+            background: var(--tg-theme-hint-color, #6c757d);
+            margin-bottom: 20px;
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 10px;
+            }
+            .header h1 {
+                font-size: 20px;
+            }
+            .header p {
+                font-size: 14px;
+            }
+            .task-form, .task-result {
+                padding: 12px;
+            }
+            .btn {
+                padding: 16px 20px;
+                font-size: 16px;
+            }
+            .user-info {
+                font-size: 12px;
+                padding: 12px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🤖 ZeroTask</h1>
-            <p>AI-помощник для решения задач</p>
-        </div>
-
-        <div class="user-info" id="userInfo">
-            Загрузка информации о пользователе...
-        </div>
-
-        <div class="task-form">
-            <h3>📝 Отправь задачу</h3>
-            <div class="form-group">
-                <label for="taskText">Текст задачи:</label>
-                <textarea id="taskText" placeholder="Опиши задачу подробно..."></textarea>
+    <div class="webapp-container">
+        <div class="container">
+            <!-- Главный экран -->
+            <div id="mainScreen" class="screen active">
+                <div class="header">
+                    <h1>🎯 ZeroTask</h1>
+                    <p>Решение задач с помощью ИИ</p>
+                </div>
+                
+                <div class="user-info">
+                    <strong>Пользователь:</strong> <span id="userName">Загрузка...</span><br>
+                    <strong>Подписка:</strong> <span id="userSubscription">Загрузка...</span>
+                </div>
+                
+                <div class="nav-buttons">
+                    <button class="btn" onclick="showTaskForm()">📝 Решить задачу</button>
+                    <button class="btn" onclick="showResults()">📋 Мои задачи</button>
+                    <button class="btn" onclick="showSubscription()">💳 Подписка</button>
+                    <button class="btn" onclick="showChannel()">📢 Канал</button>
+                    <button class="btn" onclick="showSupport()">🆘 Поддержка</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="taskImage">Или загрузи фото:</label>
-                <input type="file" id="taskImage" accept="image/*">
+            
+            <!-- Экран формы задачи -->
+            <div id="taskFormScreen" class="screen">
+                <button class="btn back-btn" onclick="showMainScreen()">← Назад</button>
+                <div class="header">
+                    <h2>📝 Решить задачу</h2>
+                    <p>Опишите задачу или загрузите фото</p>
+                </div>
+                
+                <form id="taskForm" class="task-form">
+                    <div class="form-group">
+                        <label for="taskDescription">Описание задачи:</label>
+                        <textarea id="taskDescription" name="description" rows="4" placeholder="Опишите вашу задачу подробно..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taskImage">Фото задачи (опционально):</label>
+                        <input type="file" id="taskImage" name="image" accept="image/*" onchange="previewImage(this)">
+                        <div id="imagePreview" class="image-preview" style="display: none;">
+                            <img id="previewImg" src="" alt="Предварительный просмотр">
+                            <br>
+                            <button type="button" class="remove-image" onclick="removeImage()">Удалить фото</button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn" style="width: 100%;">🚀 Отправить задачу</button>
+                </form>
             </div>
-            <button class="btn" onclick="solveTask()">🚀 Решить задачу</button>
-            <button class="btn" onclick="closeApp()" style="margin-top: 10px; background: #6c757d;">❌ Закрыть</button>
+            
+            <!-- Экран результатов -->
+            <div id="resultsScreen" class="screen">
+                <button class="btn back-btn" onclick="showMainScreen()">← Назад</button>
+                <div class="header">
+                    <h2>📋 Мои задачи</h2>
+                    <p>История ваших задач и решений</p>
+                </div>
+                
+                <div id="taskList" class="task-list">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Загружаем ваши задачи...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Экран решения -->
+            <div id="solutionScreen" class="screen">
+                <button class="btn back-btn" onclick="showMainScreen()">← Назад</button>
+                <div class="header">
+                    <h2>✅ Решение готово</h2>
+                    <p>Ваша задача решена!</p>
+                </div>
+                
+                <div id="taskResult" class="task-result">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Загружаем решение...</p>
+                    </div>
+                </div>
+            </div>
         </div>
-
-        <div class="status" id="status"></div>
     </div>
 
     <script>
+        // Конфигурация API
+        const API_BASE_URL = 'https://alekseykotlov.github.io/zerotask-webapp/';
+        
         // Инициализация Telegram WebApp
         let tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
-
-        // Получение информации о пользователе
-        const user = tg.initDataUnsafe?.user;
-        if (user) {
-            document.getElementById('userInfo').innerHTML = `
-                👤 <strong>${user.first_name}</strong>
-                ${user.username ? `(@${user.username})` : ''}
-                <br>🆔 ID: ${user.id}
-            `;
+        
+        // Загрузка информации о пользователе
+        async function loadUserInfo() {
+            try {
+                const user = tg.initDataUnsafe?.user;
+                if (user) {
+                    document.getElementById('userName').textContent = `${user.first_name} ${user.last_name || ''}`.trim();
+                    document.getElementById('userSubscription').textContent = 'Проверяется...';
+                    
+                    // Здесь можно добавить проверку подписки через API
+                    // Пока что показываем базовую информацию
+                    document.getElementById('userSubscription').textContent = 'Базовый аккаунт';
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки информации пользователя:', error);
+            }
         }
-
-        // Функция решения задачи
-        async function solveTask() {
-            const taskText = document.getElementById('taskText').value;
-            const taskImage = document.getElementById('taskImage').files[0];
+        
+        // Навигация между экранами
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+        
+        function showMainScreen() {
+            showScreen('mainScreen');
+        }
+        
+        function showTaskForm() {
+            showScreen('taskFormScreen');
+            document.getElementById('taskForm').reset();
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+        
+        function showResults() {
+            showScreen('resultsScreen');
+            loadUserTasks();
+        }
+        
+        function showSolution() {
+            showScreen('solutionScreen');
+        }
+        
+        // Обработка формы задачи
+        document.getElementById('taskForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            if (!taskText && !taskImage) {
-                showStatus('Пожалуйста, введите текст задачи или загрузите фото', 'error');
+            const description = document.getElementById('taskDescription').value.trim();
+            const imageFile = document.getElementById('taskImage').files[0];
+            
+            if (!description && !imageFile) {
+                alert('Пожалуйста, опишите задачу или загрузите фото');
                 return;
             }
-
-            showStatus('🤔 Обрабатываю задачу...', 'success');
-
+            
+            await solveTask(description, imageFile);
+        });
+        
+        // Отправка задачи
+        async function solveTask(description, imageFile) {
             try {
-                // Получаем данные пользователя из Telegram
-                const tgUser = tg.initDataUnsafe?.user;
-                if (!tgUser) {
-                    throw new Error('Не удалось получить данные пользователя');
-                }
-
-                // Создаем FormData для отправки файла
-                const formData = new FormData();
-                formData.append('telegram_id', tgUser.id);
-                formData.append('description', taskText);
+                showSolution();
                 
-                if (taskImage) {
-                    formData.append('image', taskImage);
+                const formData = new FormData();
+                formData.append('description', description);
+                if (imageFile) {
+                    formData.append('image', imageFile);
                 }
-
-                // Отправляем задачу на API
-                const response = await fetch('http://localhost:8002/api/tasks/create/', {
+                
+                // Показываем статус
+                const taskResult = document.getElementById('taskResult');
+                if (imageFile) {
+                    taskResult.innerHTML = `
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <h3>📸 Загружаю фото и извлекаю текст...</h3>
+                            <p>Обрабатываем изображение и генерируем решение</p>
+                        </div>
+                    `;
+                } else {
+                    taskResult.innerHTML = `
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <h3>🤔 Обрабатываю задачу...</h3>
+                            <p>Генерируем решение с помощью ИИ</p>
+                        </div>
+                    `;
+                }
+                
+                // Отправляем задачу на сервер
+                const response = await fetch(`${API_BASE_URL}/api/tasks/create/`, {
                     method: 'POST',
                     body: formData
                 });
-
+                
                 if (response.ok) {
                     const result = await response.json();
-                    showStatus('✅ Задача успешно отправлена! ID: ' + result.id, 'success');
-                    
-                    // Закрываем WebApp и возвращаемся в бота
-                    setTimeout(() => {
-                        tg.close();
-                    }, 3000);
+                    taskResult.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Задача успешно отправлена!</h3>
+                            <p><strong>ID задачи:</strong> ${result.task_id}</p>
+                            <p><strong>Статус:</strong> ${result.status}</p>
+                            <p>Решение будет готово в ближайшее время.</p>
+                        </div>
+                    `;
                 } else {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Ошибка сервера');
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-
+                
             } catch (error) {
-                console.error('Error:', error);
-                showStatus('❌ Ошибка при отправке задачи: ' + error.message, 'error');
+                console.error('Ошибка при отправке задачи:', error);
+                document.getElementById('taskResult').innerHTML = `
+                    <div class="error">
+                        <h3>❌ Ошибка при отправке задачи</h3>
+                        <p>${error.message}</p>
+                        <button class="btn" onclick="showTaskForm()">Попробовать снова</button>
+                    </div>
+                `;
             }
         }
-
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
+        
+        // Загрузка задач пользователя
+        async function loadUserTasks() {
+            try {
+                const user = tg.initDataUnsafe?.user;
+                if (!user) {
+                    document.getElementById('taskList').innerHTML = '<p>Не удалось загрузить информацию о пользователе</p>';
+                    return;
+                }
+                
+                const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/tasks/`);
+                if (response.ok) {
+                    const tasks = await response.json();
+                    displayTasks(tasks);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки задач:', error);
+                document.getElementById('taskList').innerHTML = `
+                    <div class="error">
+                        <p>Ошибка загрузки задач: ${error.message}</p>
+                        <button class="btn" onclick="loadUserTasks()">Попробовать снова</button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Отображение списка задач
+        function displayTasks(tasks) {
+            const taskList = document.getElementById('taskList');
             
-            if (type === 'success') {
-                setTimeout(() => {
-                    status.style.display = 'none';
-                }, 5000);
+            if (!tasks || tasks.length === 0) {
+                taskList.innerHTML = '<p>У вас пока нет задач</p>';
+                return;
+            }
+            
+            const tasksHtml = tasks.map(task => `
+                <div class="task-item" onclick="loadTaskSolution(${task.id})">
+                    <h4>Задача #${task.id}</h4>
+                    <p><strong>Описание:</strong> ${task.description || 'Фото задача'}</p>
+                    <p><strong>Статус:</strong> ${task.status}</p>
+                    <p><strong>Создана:</strong> ${new Date(task.created_at).toLocaleString()}</p>
+                </div>
+            `).join('');
+            
+            taskList.innerHTML = tasksHtml;
+        }
+        
+        // Загрузка решения задачи
+        async function loadTaskSolution(taskId) {
+            try {
+                showSolution();
+                
+                const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/`);
+                if (response.ok) {
+                    const task = await response.json();
+                    displayTaskSolution(task);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки решения:', error);
+                document.getElementById('taskResult').innerHTML = `
+                    <div class="error">
+                        <h3>❌ Ошибка загрузки решения</h3>
+                        <p>${error.message}</p>
+                        <button class="btn" onclick="showResults()">Вернуться к списку</button>
+                    </div>
+                `;
             }
         }
-
-        // Функция закрытия приложения
-        function closeApp() {
-            tg.close();
+        
+        // Отображение решения задачи
+        function displayTaskSolution(task) {
+            const taskResult = document.getElementById('taskResult');
+            
+            if (task.status === 'processing') {
+                displayProcessingStatus(task);
+                // Повторяем попытку через 3 секунды
+                setTimeout(() => loadTaskSolution(task.id), 3000);
+                return;
+            }
+            
+            if (task.status === 'completed' && task.solution) {
+                taskResult.innerHTML = `
+                    <div class="success">
+                        <h3>✅ Решение готово!</h3>
+                        <div class="solution-content">
+                            ${task.solution}
+                        </div>
+                        <div class="task-info">
+                            <p><strong>Описание:</strong> ${task.description || 'Фото задача'}</p>
+                            <p><strong>Создана:</strong> ${new Date(task.created_at).toLocaleString()}</p>
+                        </div>
+                    </div>
+                `;
+            } else if (task.status === 'failed') {
+                taskResult.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Ошибка при решении задачи</h3>
+                        <p>${task.error_message || 'Неизвестная ошибка'}</p>
+                        <button class="btn" onclick="showTaskForm()">Попробовать снова</button>
+                    </div>
+                `;
+            } else {
+                taskResult.innerHTML = `
+                    <div class="info">
+                        <h3>ℹ️ Информация о задаче</h3>
+                        <p><strong>Статус:</strong> ${task.status}</p>
+                        <p><strong>Описание:</strong> ${task.description || 'Фото задача'}</p>
+                        <p><strong>Создана:</strong> ${new Date(task.created_at).toLocaleString()}</p>
+                    </div>
+                `;
+            }
         }
-
-        // Обработка файлов
-        document.getElementById('taskImage').addEventListener('change', function(e) {
-            const file = e.target.files[0];
+        
+        // Отображение статуса обработки
+        function displayProcessingStatus(task) {
+            const taskResult = document.getElementById('taskResult');
+            taskResult.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <h3>🔄 Обрабатываем ваше изображение...</h3>
+                    <p>Извлекаем текст из фото и генерируем решение</p>
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <strong>Описание:</strong> ${task.description || 'Изображение загружено'}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Предварительный просмотр изображения
+        function previewImage(input) {
+            const file = input.files[0];
             if (file) {
-                showStatus(`📷 Фото загружено: ${file.name}`, 'success');
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
             }
+        }
+        
+        // Удаление изображения
+        function removeImage() {
+            document.getElementById('taskImage').value = '';
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+        
+        // Заглушки для остальных функций
+        function showSubscription() {
+            alert('Функция подписки будет доступна позже');
+        }
+        
+        function showChannel() {
+            alert('Ссылка на канал будет доступна позже');
+        }
+        
+        function showSupport() {
+            alert('Функция поддержки будет доступна позже');
+        }
+        
+        // Проверяем task_id в URL при загрузке
+        window.addEventListener('load', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('task_id');
+            
+            if (taskId) {
+                showSolution();
+                loadTaskSolution(taskId);
+            }
+            
+            loadUserInfo();
         });
     </script>
 </body>
-</html> 
+</html>
