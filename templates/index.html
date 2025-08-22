@@ -1,0 +1,1189 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZeroTask - Решение задач с помощью ИИ</title>
+    
+    <!-- Telegram WebApp -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333333;
+            line-height: 1.6;
+        }
+
+        .webapp-container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: #ffffff;
+            min-height: 100vh;
+        }
+
+        .container {
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: #ffffff;
+            color: #333333;
+            padding: 16px 20px;
+            margin: -16px -16px 0 -16px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .logo {
+            height: 45px; /* Slightly increased for better visibility */
+            width: auto;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, #673AB7 0%, #8E24AA 100%);
+            color: white;
+            padding: 60px 20px;
+            margin: 0 -16px 30px -16px;
+            text-align: center;
+            border-radius: 0 0 20px 20px;
+        }
+
+        .hero-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        /* Brand Description */
+        .brand-description {
+            background: #ffffff;
+            padding: 24px 20px;
+            margin: 0 -16px 30px -16px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .brand-description h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #673AB7;
+            margin-bottom: 8px;
+        }
+
+        .brand-description p {
+            color: #FF9800;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* Navigation */
+        .nav-tabs {
+            display: flex;
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #666666;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-tab.active {
+            background: #673AB7;
+            color: white;
+        }
+
+        /* Task Form */
+        .task-form {
+            background: #ffffff;
+            padding: 24px 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .task-form h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #333333;
+            margin-bottom: 8px;
+        }
+
+        .form-group textarea,
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group textarea:focus,
+        .form-group input[type="file"]:focus {
+            outline: none;
+            border-color: #673AB7;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: #673AB7;
+            color: white;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background: #5E35B1;
+        }
+
+        /* Image Upload Area */
+        .image-upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            padding: 16px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+            margin-top: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .image-upload-area:hover {
+            border-color: #673AB7;
+            background: #f0f0f0;
+        }
+
+        .upload-icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        /* KaTeX Math Styling */
+        .katex {
+            font-size: 1.1em;
+        }
+
+        .katex-display {
+            margin: 1em 0;
+            text-align: center;
+        }
+
+        .katex-display > .katex {
+            display: inline-block;
+            text-align: left;
+        }
+
+        /* Solution and Description Math Styling */
+        #taskDescription .katex,
+        #solutionText .katex {
+            font-size: 1.05em;
+        }
+
+        #taskDescription .katex-display,
+        #solutionText .katex-display {
+            margin: 0.8em 0;
+        }
+
+        /* Task Description Math Styling */
+        .task-description-content .katex {
+            font-size: 1.1em;
+        }
+
+        .task-description-content .katex-display {
+            margin: 1em 0;
+            text-align: center;
+        }
+
+        /* Delete Button */
+        .delete-btn {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            min-width: 80px;
+        }
+
+        .delete-btn:hover {
+            background: #d32f2f;
+        }
+
+        /* Solution Screen */
+        .solution-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .solution-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333333;
+            margin-bottom: 8px;
+        }
+
+        .solution-header p {
+            color: #666666;
+            font-size: 16px;
+        }
+
+        .solution-content {
+            background: #ffffff;
+            padding: 24px 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .task-description,
+        .solution-text {
+            margin-bottom: 24px;
+        }
+
+        .task-description h3,
+        .solution-text h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333333;
+            margin-bottom: 12px;
+        }
+
+        .task-description-content {
+            background: #f8f9fa;
+            border-left: 4px solid #673AB7;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .task-description-content p {
+            margin: 0 0 12px 0;
+        }
+
+        .task-description-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .solution-text {
+            line-height: 1.8;
+        }
+
+        .solution-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-btn {
+            flex: 1;
+            background: #673AB7;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: #5E35B1;
+        }
+
+        /* History Screen */
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .history-header h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #333333;
+        }
+
+        .back-btn {
+            background: #FF9800;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .task-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .task-item {
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .task-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .task-item h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333333;
+            margin-bottom: 8px;
+        }
+
+        .task-item p {
+            color: #666666;
+            font-size: 14px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .task-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #666666;
+        }
+
+        .task-status {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .task-status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .task-status.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .task-status.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666666;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* About Project Section */
+        .about-section {
+            background: #ffffff;
+            padding: 24px 20px;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .about-section h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333333;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .about-section p {
+            color: #666666;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .feature-card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, #673AB7, #8E24AA);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            color: white;
+            font-size: 20px;
+        }
+
+        .feature-card h4 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #333333;
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            color: #666666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* Loading Screen */
+        .loading-content {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e0e0e0;
+            border-top: 4px solid #673AB7;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-content h3 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333333;
+            margin-bottom: 8px;
+        }
+
+        .loading-content p {
+            color: #666666;
+            font-size: 16px;
+        }
+
+        /* Footer */
+        .footer {
+            background: linear-gradient(135deg, #673AB7 0%, #8E24AA 100%);
+            color: white;
+            padding: 40px 20px;
+            margin: 40px -16px -16px -16px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+        }
+
+        /* Footer Logo */
+        .footer-logo {
+            height: 85px; /* Slightly increased for better visibility */
+            width: auto;
+            margin-bottom: 20px;
+        }
+
+        .footer-bottom {
+            color: white;
+            font-size: 14px;
+        }
+
+        /* Screen Management */
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header {
+                padding: 12px 16px;
+            }
+
+            .hero-section {
+                padding: 40px 16px;
+            }
+
+            .hero-title {
+                font-size: 24px;
+            }
+
+            .brand-description {
+                padding: 20px 16px;
+                margin: 0 -16px 20px -16px;
+            }
+
+            .brand-description h2 {
+                font-size: 20px;
+            }
+
+            .brand-description p {
+                font-size: 14px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero-title {
+                font-size: 20px;
+            }
+
+            .logo {
+                height: 35px;
+            }
+
+            .footer-logo {
+                height: 70px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="webapp-container">
+        <div class="container">
+            <!-- Hero Section as Header -->
+            <div class="hero-section">
+                <h1 class="hero-title">Мы поможем тебе решить домашку</h1>
+            </div>
+
+            <!-- Brand Description -->
+            <div class="brand-description">
+                <h2>🤖 ZeroTask</h2>
+                <p>Решение задач с помощью искусственного интеллекта</p>
+            </div>
+
+            <!-- Navigation -->
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="showScreen('main')">📝 Задача</button>
+                <button class="nav-tab" onclick="showScreen('history')">📚 История</button>
+            </div>
+
+            <!-- Main Screen -->
+            <div id="mainScreen" class="screen active">
+
+                <!-- Task Form -->
+                <div class="task-form">
+                    <h3>📝 Отправить задачу</h3>
+                    <form id="taskForm">
+                        <div class="form-group">
+                            <label for="taskInput">Описание задачи:</label>
+                            <textarea id="taskInput" placeholder="Введите текст задачи или загрузите фото..." rows="4"></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="imageInput">Или загрузите фото:</label>
+                            <input type="file" id="imageInput" accept="image/*" onchange="handleImageUpload(event)" style="display: none;">
+                            <div class="image-upload-area" onclick="document.getElementById('imageInput').click()">
+                                <span class="upload-icon">🏔️</span>
+                                <span class="upload-text">Выберите изображение</span>
+                            </div>
+                            <div id="imagePreview" style="display: none;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
+                                    <img id="previewImg" src="" alt="Preview" style="max-width: 200px;">
+                                    <button type="button" onclick="removeImage()" class="delete-btn">Удалить</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="submit-btn">🚀 Решить задачу</button>
+                    </form>
+                </div>
+
+                <!-- About Project Section -->
+                <div class="about-section">
+                    <h3>О проекте</h3>
+                    <p>Платформа создана для школьников и родителей, которые хотят быстро и удобно решать домашние задания.</p>
+                </div>
+
+                <!-- Features Grid -->
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🤖</div>
+                        <h4>ИИ решения</h4>
+                        <p>Быстрые и точные ответы с помощью искусственного интеллекта</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📸</div>
+                        <h4>Фото загрузка</h4>
+                        <p>Просто сфотографируйте задачу и получите решение</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📚</div>
+                        <h4>История задач</h4>
+                        <p>Все ваши решенные задачи сохраняются в истории</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solution Screen -->
+            <div id="solutionScreen" class="screen">
+                <div class="solution-header">
+                    <h2 id="solutionHeader">✅ Решение готово</h2>
+                    <p id="solutionSubheader">Ваша задача решена успешно!</p>
+                </div>
+                
+                <div class="solution-content">
+                    <div class="task-description">
+                        <h3>📝 Задача:</h3>
+                        <div id="taskDescription" class="task-description-content"></div>
+                    </div>
+                    
+                    <div class="solution-text">
+                        <h3>🎯 Решение:</h3>
+                        <div id="solutionText"></div>
+                    </div>
+                </div>
+                
+                <div class="solution-actions">
+                    <button onclick="showScreen('main')" class="action-btn">📝 Новая задача</button>
+                    <button onclick="showScreen('history')" class="action-btn">📚 История</button>
+                </div>
+            </div>
+
+            <!-- History Screen -->
+            <div id="historyScreen" class="screen">
+                <div class="history-header">
+                    <h2>📚 История задач</h2>
+                    <button onclick="showScreen('main')" class="back-btn">← Назад</button>
+                </div>
+                
+                <div id="taskList" class="task-list">
+                    <!-- Tasks will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Loading Screen -->
+            <div id="loadingScreen" class="screen">
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <h3>🤖 Обрабатываем задачу...</h3>
+                    <p>Пожалуйста, подождите</p>
+                </div>
+            </div>
+
+                               <!-- Footer -->
+                   <footer class="footer">
+                       <div class="footer-bottom">
+                           <p>© 2025 MyGDZ • Пользовательское соглашение • Обработка данных</p>
+                       </div>
+                   </footer>
+        </div>
+    </div>
+
+    <script>
+        // Telegram WebApp initialization
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+            Telegram.WebApp.ready();
+            Telegram.WebApp.expand();
+        }
+
+        let currentUser = null;
+        let selectedImage = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for task_id in URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskId = urlParams.get('task_id');
+            
+            if (taskId) {
+                // Load existing task solution
+                loadTaskSolution(taskId);
+            } else {
+                // Load user info and task history
+                loadUserInfo();
+                loadTaskHistory();
+            }
+            
+            // Initialize KaTeX rendering with multiple attempts
+            let katexAttempts = 0;
+            const maxAttempts = 10;
+            
+            function tryRenderKaTeX() {
+                if (typeof renderMathInElement !== 'undefined') {
+                    renderMathFormulas();
+                } else if (katexAttempts < maxAttempts) {
+                    katexAttempts++;
+                    setTimeout(tryRenderKaTeX, 200);
+                } else {
+                    console.error('KaTeX failed to load after multiple attempts');
+                }
+            }
+            
+            setTimeout(tryRenderKaTeX, 100);
+        });
+
+        // Screen management
+        function showScreen(screenName) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+
+            // Show target screen
+            document.getElementById(screenName + 'Screen').classList.add('active');
+
+            // Update navigation tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            if (screenName === 'main') {
+                document.querySelector('.nav-tab:first-child').classList.add('active');
+            } else if (screenName === 'history') {
+                document.querySelector('.nav-tab:last-child').classList.add('active');
+            }
+        }
+
+        // Image handling
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedImage = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('previewImg').src = e.target.result;
+                    document.getElementById('imagePreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage() {
+            selectedImage = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imagePreview').style.display = 'none';
+        }
+
+        // User info loading
+        function loadUserInfo() {
+            if (typeof Telegram !== 'undefined' && Telegram.WebApp && Telegram.WebApp.initDataUnsafe) {
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                if (user) {
+                    currentUser = {
+                        id: user.id,
+                        first_name: user.first_name,
+                        last_name: user.last_name,
+                        username: user.username
+                    };
+                }
+            }
+        }
+
+        // Task form handling
+        document.getElementById('taskForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const taskInput = document.getElementById('taskInput');
+            const taskText = taskInput.value.trim();
+            
+            if (!taskText && !selectedImage) {
+                alert('Пожалуйста, введите текст задачи или загрузите изображение');
+                return;
+            }
+
+            // Show loading screen
+            showScreen('loading');
+            
+            // Create task
+            createTask(taskText, selectedImage);
+        });
+
+        // API functions
+        async function createTask(description, image = null) {
+            try {
+                const formData = new FormData();
+                formData.append('description', description);
+                
+                if (currentUser) {
+                    formData.append('telegram_id', currentUser.id);
+                    formData.append('username', currentUser.username || '');
+                    formData.append('first_name', currentUser.first_name || '');
+                }
+                
+                if (image) {
+                    formData.append('image', image);
+                }
+
+                const response = await fetch('/api/tasks/create/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
+                }
+                
+                if (data.status === 'success') {
+                    // Poll for task completion
+                    pollTaskStatus(data.task_id);
+                } else {
+                    throw new Error(data.message || 'Ошибка создания задачи');
+                }
+            } catch (error) {
+                console.error('Error creating task:', error);
+                showError('Ошибка при создании задачи: ' + error.message);
+            }
+        }
+
+        async function pollTaskStatus(taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/`);
+                const task = await response.json();
+                
+                if (task.status === 'completed') {
+                    showTaskSolution(task);
+                } else if (task.status === 'failed') {
+                    showError('Ошибка при обработке задачи');
+                } else {
+                    // Continue polling
+                    setTimeout(() => pollTaskStatus(taskId), 2000);
+                }
+            } catch (error) {
+                console.error('Error polling task status:', error);
+                showError('Ошибка при проверке статуса задачи');
+            }
+        }
+
+        async function loadTaskSolution(taskId) {
+            try {
+                const response = await fetch(`/api/tasks/${taskId}/`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const task = await response.json();
+                showTaskSolution(task);
+            } catch (error) {
+                console.error('Error loading task solution:', error);
+                showError('Ошибка при загрузке решения');
+            }
+        }
+
+        async function loadTaskHistory() {
+            if (!currentUser) {
+                showEmptyHistory();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/users/${currentUser.id}/tasks/`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const tasks = await response.json();
+                displayTaskHistory(tasks);
+            } catch (error) {
+                console.error('Error loading task history:', error);
+                showEmptyHistory();
+            }
+        }
+
+        // Display functions
+        function showTaskSolution(task) {
+            // Update solution header based on task status
+            const solutionHeader = document.getElementById('solutionHeader');
+            const solutionSubheader = document.getElementById('solutionSubheader');
+            
+            if (task.status === 'completed') {
+                solutionHeader.textContent = '✅ Решение готово';
+                solutionSubheader.textContent = 'Ваша задача решена успешно!';
+            } else if (task.status === 'pending') {
+                solutionHeader.textContent = '🤖 Бот ZeroTask решает задачу';
+                solutionSubheader.textContent = 'Пожалуйста, подождите...';
+            } else {
+                solutionHeader.textContent = '❌ Ошибка обработки';
+                solutionSubheader.textContent = 'Произошла ошибка при решении задачи';
+            }
+            
+            // Display task description and solution
+            const taskDescription = document.getElementById('taskDescription');
+            if (task.description) {
+                // Format the description with proper line breaks
+                const formattedDescription = task.description
+                    .replace(/\n/g, '<br>')
+                    .replace(/^(.+?):\s*/, '<strong>$1:</strong> ');
+                taskDescription.innerHTML = formattedDescription;
+            } else {
+                taskDescription.innerHTML = 'Описание не найдено';
+            }
+            
+            if (task.solution) {
+                document.getElementById('solutionText').innerHTML = task.solution;
+            } else {
+                document.getElementById('solutionText').innerHTML = '<p>Решение пока не готово...</p>';
+            }
+            
+            // Render math formulas in both description and solution
+            setTimeout(() => {
+                renderMathFormulas();
+            }, 50);
+            
+            // Show solution screen
+            showScreen('solution');
+        }
+
+        function displayTaskHistory(tasks) {
+            const taskList = document.getElementById('taskList');
+            
+            if (!tasks || tasks.length === 0) {
+                showEmptyHistory();
+                return;
+            }
+
+            taskList.innerHTML = tasks.map(task => `
+                <div class="task-item" onclick="loadTaskSolution('${task.id}')">
+                    <h4>${task.description ? task.description.substring(0, 50) + (task.description.length > 50 ? '...' : '') : 'Задача без описания'}</h4>
+                    <p>${task.source === 'image' ? '📸 Фото' : '📝 Текст'}</p>
+                    <div class="task-meta">
+                        <span>${new Date(task.created_at).toLocaleDateString('ru-RU')}</span>
+                        <span class="task-status ${task.status}">${getStatusText(task.status)}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Render math formulas in task history
+            renderMathFormulas();
+        }
+
+        function showEmptyHistory() {
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = `
+                <div class="empty-state">
+                    <svg fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                    </svg>
+                    <h3>История пуста</h3>
+                    <p>У вас пока нет решенных задач</p>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            alert(message);
+            showScreen('main');
+        }
+
+
+
+        function getStatusText(status) {
+            switch (status) {
+                case 'pending': return '⏳ Обрабатывается';
+                case 'completed': return '✅ Готово';
+                case 'failed': return '❌ Ошибка';
+                default: return status;
+            }
+        }
+
+        function renderMathFormulas() {
+            console.log('renderMathFormulas called');
+            console.log('renderMathInElement available:', typeof renderMathInElement !== 'undefined');
+            console.log('katex available:', typeof katex !== 'undefined');
+            
+            // Wait for KaTeX to be loaded
+            if (typeof renderMathInElement === 'undefined') {
+                console.log('KaTeX not loaded yet, retrying...');
+                setTimeout(renderMathFormulas, 100);
+                return;
+            }
+            
+            try {
+                // Render math in task description
+                const taskDescription = document.getElementById('taskDescription');
+                if (taskDescription) {
+                    console.log('Rendering math in task description');
+                    console.log('Task description content:', taskDescription.innerHTML.substring(0, 100));
+                    renderMathInElement(taskDescription, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false,
+                        output: 'html',
+                        strict: false
+                    });
+                }
+                
+                // Render math in solution text
+                const solutionText = document.getElementById('solutionText');
+                if (solutionText) {
+                    console.log('Rendering math in solution text');
+                    console.log('Solution text content:', solutionText.innerHTML.substring(0, 100));
+                    renderMathInElement(solutionText, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false},
+                            {left: '\\(', right: '\\)', display: false},
+                            {left: '\\[', right: '\\]', display: true}
+                        ],
+                        throwOnError: false,
+                        output: 'html',
+                        strict: false
+                    });
+                }
+                
+                console.log('KaTeX rendering completed successfully');
+            } catch (error) {
+                console.error('KaTeX rendering error:', error);
+                
+                // Fallback: try manual rendering
+                if (typeof katex !== 'undefined') {
+                    console.log('Trying manual KaTeX rendering...');
+                    tryManualKaTeXRendering();
+                }
+            }
+        }
+        
+        function tryManualKaTeXRendering() {
+            const taskDescription = document.getElementById('taskDescription');
+            const solutionText = document.getElementById('solutionText');
+            
+            if (taskDescription) {
+                let content = taskDescription.innerHTML;
+                // Replace inline math \(...\)
+                content = content.replace(/\\\(([^)]+)\\\)/g, function(match, formula) {
+                    try {
+                        return katex.renderToString(formula, { throwOnError: false });
+                    } catch (e) {
+                        return match;
+                    }
+                });
+                // Replace display math \[...\]
+                content = content.replace(/\\\[([^\]]+)\\\]/g, function(match, formula) {
+                    try {
+                        return '<div style="text-align: center; margin: 1em 0;">' + 
+                               katex.renderToString(formula, { throwOnError: false, displayMode: true }) + 
+                               '</div>';
+                    } catch (e) {
+                        return match;
+                    }
+                });
+                taskDescription.innerHTML = content;
+            }
+            
+            if (solutionText) {
+                let content = solutionText.innerHTML;
+                // Replace inline math \(...\)
+                content = content.replace(/\\\(([^)]+)\\\)/g, function(match, formula) {
+                    try {
+                        return katex.renderToString(formula, { throwOnError: false });
+                    } catch (e) {
+                        return match;
+                    }
+                });
+                // Replace display math \[...\]
+                content = content.replace(/\\\[([^\]]+)\\\]/g, function(match, formula) {
+                    try {
+                        return '<div style="text-align: center; margin: 1em 0;">' + 
+                               katex.renderToString(formula, { throwOnError: false, displayMode: true }) + 
+                               '</div>';
+                    } catch (e) {
+                        return match;
+                    }
+                });
+                solutionText.innerHTML = content;
+            }
+        }
+    </script>
+</body>
+</html> 

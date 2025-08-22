@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KaTeX Test</title>
+    
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>KaTeX Test Page</h1>
+    
+    <div class="test-section">
+        <h2>Test 1: Inline Math</h2>
+        <p>Формула: \(\cos\left(\frac{x}{2} + \frac{\pi}{3}\right) - 1 = 0\)</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 2: Display Math</h2>
+        <p>Формула:</p>
+        \[\cos\left(\frac{x}{2} + \frac{\pi}{3}\right) - 1 = 0\]
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 3: Dollar Signs</h2>
+        <p>Формула: $\cos\left(\frac{x}{2} + \frac{\pi}{3}\right) - 1 = 0$</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test 4: Double Dollar Signs</h2>
+        <p>Формула:</p>
+        $$\cos\left(\frac{x}{2} + \frac{\pi}{3}\right) - 1 = 0$$
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false,
+                    output: 'html',
+                    strict: false
+                });
+                console.log('KaTeX rendering completed');
+            } else {
+                console.error('KaTeX not loaded');
+            }
+        });
+    </script>
+</body>
+</html>

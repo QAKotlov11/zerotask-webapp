@@ -25,6 +25,14 @@ class User(models.Model):
         from config import TRIAL_LIMIT
         return max(0, TRIAL_LIMIT - self.trials_used)
     
+    def use_trial(self):
+        """Использовать одно пробное решение"""
+        if self.trials_left > 0:
+            self.trials_used += 1
+            self.save()
+            return True
+        return False
+    
     @property
     def has_active_subscription(self):
         """Есть ли активная подписка"""
@@ -90,15 +98,22 @@ class Task(models.Model):
         ('failed', 'Ошибка'),
     ]
     
+    SOURCE_CHOICES = [
+        ('text', 'Текст'),
+        ('image', 'Изображение'),
+    ]
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tasks', verbose_name="Пользователь")
     description = models.TextField(blank=True, verbose_name="Описание задачи")
     image = models.ImageField(upload_to='tasks/', blank=True, null=True, verbose_name="Фото задачи")
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='text', verbose_name="Источник")
     created_at = models.DateTimeField(default=timezone.now, verbose_name="Дата создания")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name="Статус")
     solution = models.TextField(blank=True, verbose_name="Решение")
     solution_image = models.ImageField(upload_to='solutions/', blank=True, null=True, verbose_name="Фото решения")
-    completed_at = models.DateTimeField(blank=True, null=True, verbose_name="Дата завершения")
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name="Дата завершения")
+    error_message = models.TextField(blank=True, null=True, verbose_name="Сообщение об ошибке")
     
     class Meta:
         verbose_name = "Задача"

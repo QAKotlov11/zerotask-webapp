@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
@@ -30,6 +31,10 @@ from config import *
 # Инициализация OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+# Константы для подписки
+SUBSCRIPTION_PRICE = 290
+SUBSCRIPTION_DAYS = 30
+
 class MyGDZBot:
     def __init__(self):
         self.application = Application.builder().token(BOT_TOKEN).build()
@@ -41,6 +46,7 @@ class MyGDZBot:
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CallbackQueryHandler(self.button_callback))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text))
+        self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка команды /start"""
@@ -305,8 +311,9 @@ class MyGDZBot:
         """Открыть WebApp"""
         query = update.callback_query
         
-        text = "🚀 Открываю мини-приложение..."
+        text = "🚀 Открываю мини-приложение для решения задач..."
         keyboard = [
+            [InlineKeyboardButton("🔍 Открыть WebApp", web_app=WebAppInfo(url=WEBAPP_URL_DEV))],
             [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
         ]
         
@@ -322,10 +329,10 @@ class MyGDZBot:
 /help - Эта справка
 
 🔧 Как использовать:
-1. Нажмите "🧠 Решить задачу"
-2. Откройте мини-приложение
-3. Загрузите фото или введите текст
-4. Получите решение!
+1. Отправьте текст задачи или фото прямо в чат
+2. Бот автоматически создаст задачу и откроет WebApp
+3. Или нажмите "🧠 Решить задачу" для открытия WebApp
+4. Получите пошаговое решение с формулами!
 
 💬 По всем вопросам обращайтесь в поддержку."""
         
@@ -336,51 +343,147 @@ class MyGDZBot:
         user = update.effective_user
         text = update.message.text
         
-        # Проверяем, есть ли у пользователя активная задача
-        active_task = await sync_to_async(lambda: Task.objects.filter(
-            user__telegram_id=user.id,
-            status='pending'
-        ).first)()
-        
-        if active_task:
-            # Если есть активная задача, обрабатываем её
-            await self.process_task_solution(update, context, active_task, text)
-        else:
-            # Иначе показываем главное меню
-            await update.message.reply_text("Используйте /start для начала работы с ботом.")
-    
-    async def process_task_solution(self, update: Update, context: ContextTypes.DEFAULT_TYPE, task: Task, user_text: str):
-        """Обработка решения задачи"""
-        user = update.effective_user
-        
         try:
-            # Отправляем задачу в OpenAI
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": "Ты эксперт по решению задач. Давай подробные пошаговые решения с формулами и объяснениями."},
-                    {"role": "user", "content": f"Задача: {task.description}\n\nДополнительная информация от пользователя: {user_text}\n\nРеши задачу пошагово с формулами."}
-                ],
-                max_tokens=OPENAI_MAX_TOKENS,
-                temperature=OPENAI_TEMPERATURE
+            # Получаем или создаем пользователя
+            db_user, created = await sync_to_async(User.objects.get_or_create)(
+                telegram_id=user.id,
+                defaults={
+                    'username': user.username,
+                    'first_name': user.first_name,
+                    'chat_id': update.effective_chat.id,
+                }
             )
             
-            solution = response.choices[0].message.content
+            if not created:
+                # Обновляем информацию
+                db_user.username = user.username
+                db_user.first_name = user.first_name
+                db_user.chat_id = update.effective_chat.id
+                await sync_to_async(db_user.save)()
             
-            # Обновляем задачу
-            task.solution = solution
-            task.status = 'completed'
-            await sync_to_async(task.save)()
+            # Проверяем подписку
+            has_subscription = await sync_to_async(lambda: db_user.has_active_subscription)()
+            trials_left = await sync_to_async(lambda: db_user.trials_left)()
             
-            # Отправляем решение пользователю
+            if not has_subscription and trials_left <= 0:
+                await update.message.reply_text(
+                    "❌ У вас закончились бесплатные попытки. Оформите подписку для продолжения работы.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔐 Оформить подписку", callback_data="subscription")]
+                    ])
+                )
+                return
+            
+            # Создаем задачу
+            task = await sync_to_async(Task.objects.create)(
+                user=db_user,
+                description=text,
+                source='text',
+                status='pending'
+            )
+            
+            # Отправляем сообщение о получении задачи
             await update.message.reply_text(
-                f"✅ Задача решена!\n\n{solution}",
-                parse_mode='Markdown'
+                "✅ Задача получена! Уже решаю...",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+                ])
             )
+            
+            # Запускаем обработку задачи в Celery
+            from bot.tasks import process_task_text
+            process_task_text.delay(str(task.id))
+            
+            # Уменьшаем количество пробных попыток, если нет подписки
+            if not has_subscription and trials_left > 0:
+                await sync_to_async(db_user.use_trial)()
             
         except Exception as e:
-            logger.error(f"Ошибка при решении задачи: {e}")
-            await update.message.reply_text("❌ Произошла ошибка при решении задачи. Попробуйте позже.")
+            logger.error(f"Ошибка при обработке текстового сообщения: {e}")
+            await update.message.reply_text("❌ Произошла ошибка при обработке задачи. Попробуйте позже.")
+    
+    async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка фото"""
+        user = update.effective_user
+        photo = update.message.photo[-1]  # Берем самое большое фото
+        
+        try:
+            # Получаем или создаем пользователя
+            db_user, created = await sync_to_async(User.objects.get_or_create)(
+                telegram_id=user.id,
+                defaults={
+                    'username': user.username,
+                    'first_name': user.first_name,
+                    'chat_id': update.effective_chat.id,
+                }
+            )
+            
+            if not created:
+                # Обновляем информацию
+                db_user.username = user.username
+                db_user.first_name = user.first_name
+                db_user.chat_id = update.effective_chat.id
+                await sync_to_async(db_user.save)()
+            
+            # Проверяем подписку
+            has_subscription = await sync_to_async(lambda: db_user.has_active_subscription)()
+            trials_left = await sync_to_async(lambda: db_user.trials_left)()
+            
+            if not has_subscription and trials_left <= 0:
+                await update.message.reply_text(
+                    "❌ У вас закончились бесплатные попытки. Оформите подписку для продолжения работы.",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔐 Оформить подписку", callback_data="subscription")]
+                    ])
+                )
+                return
+            
+            # Создаем задачу
+            task = await sync_to_async(Task.objects.create)(
+                user=db_user,
+                description="Фото задача",
+                source='image',
+                status='pending'
+            )
+            
+            # Скачиваем фото
+            file = await context.bot.get_file(photo.file_id)
+            file_path = f"media/tasks/{task.id}.jpg"
+            
+            # Создаем директорию если её нет
+            import os
+            os.makedirs("media/tasks", exist_ok=True)
+            
+            # Скачиваем файл
+            await file.download_to_drive(file_path)
+            
+            # Обновляем задачу с путем к файлу
+            task.image = f"tasks/{task.id}.jpg"
+            await sync_to_async(task.save)()
+            
+            # Отправляем сообщение о получении задачи
+            await update.message.reply_text(
+                "📸 Фото получено! Обрабатываю изображение и решаю...",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+                ])
+            )
+            
+
+            
+            # Запускаем обработку задачи в Celery
+            from bot.tasks import process_task_image
+            process_task_image.delay(str(task.id))
+            
+            # Уменьшаем количество пробных попыток, если нет подписки
+            if not has_subscription and trials_left > 0:
+                await sync_to_async(db_user.use_trial)()
+            
+        except Exception as e:
+            logger.error(f"Ошибка при обработке фото: {e}")
+            await update.message.reply_text("❌ Произошла ошибка при обработке фото. Попробуйте позже.")
+    
+
     
     def run(self):
         """Запуск бота"""

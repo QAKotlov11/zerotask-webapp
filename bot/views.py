@@ -10,13 +10,30 @@ from django.http import HttpResponse
 from datetime import timedelta
 import json
 import logging
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from .models import User, Subscription, Task
 from .serializers import (
     UserSerializer, SubscriptionSerializer, TaskSerializer,
     TaskCreateSerializer, UserStatsSerializer
 )
+from .tasks import process_task_image
 
 logger = logging.getLogger(__name__)
+
+class SimpleTestView(APIView):
+    """Очень простой тест"""
+    
+    def get(self, request):
+        return Response({'status': 'OK', 'message': 'Простой тест работает!'})
+
+class TestAPIView(APIView):
+    """Простой тестовый API для проверки"""
+    
+    def get(self, request):
+        return Response({'message': 'Тестовый API работает!'})
+    
+    def post(self, request):
+        return Response({'message': 'POST запрос получен!', 'data': request.data})
 
 class UserViewSet(viewsets.ModelViewSet):
     """API для управления пользователями"""
@@ -99,41 +116,219 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return TaskCreateSerializer
         return TaskSerializer
+
+class TaskCreateView(APIView):
+    """API для создания задачи из WebApp"""
     
-    @action(detail=True, methods=['post'])
-    def complete(self, request, pk=None):
-        """Завершить задачу с решением"""
-        task = self.get_object()
-        solution = request.data.get('solution')
-        solution_image = request.FILES.get('solution_image')
-        
-        if not solution:
-            return Response(
-                {'error': 'Необходимо указать решение'},
-                status=status.HTTP_400_BAD_REQUEST
+    def get(self, request):
+        """Тестовый GET метод"""
+        return Response({'status': 'OK', 'message': 'TaskCreateView работает!'})
+    
+    def post(self, request):
+        """Создание задачи"""
+        try:
+            # Получаем данные из запроса
+            data = request.data
+            logger.info(f"Получены данные задачи: {data}")
+            
+            # Получаем или создаем пользователя
+            telegram_id = data.get('telegram_id', 123456789)  # Временно используем заглушку
+            
+            user, created = User.objects.get_or_create(
+                telegram_id=telegram_id,
+                defaults={
+                    'username': data.get('username', f'user_{telegram_id}'),
+                    'first_name': data.get('first_name', 'Пользователь'),
+                    'chat_id': data.get('chat_id', telegram_id),
+                }
             )
-        
-        task.solution = solution
-        if solution_image:
-            task.solution_image = solution_image
-        task.status = 'completed'
-        task.save()
-        
-        serializer = TaskSerializer(task)
-        return Response(serializer.data)
+            
+            # Проверяем подписку и пробные решения
+            has_subscription = user.has_active_subscription
+            trials_left = user.trials_left
+            
+            if not has_subscription and trials_left <= 0:
+                logger.warning(f"Пользователь {user.telegram_id} пытается создать задачу без подписки и пробных решений")
+                return Response({
+                    'status': 'error',
+                    'message': 'У вас закончились бесплатные попытки. Оформите подписку для продолжения работы.',
+                    'error_code': 'TRIAL_LIMIT_EXCEEDED'
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Определяем источник задачи
+            source = 'text'
+            if 'image' in request.FILES:
+                source = 'image'
+            
+            # Создаем задачу
+            task = Task.objects.create(
+                user=user,
+                description=data.get('description', ''),
+                source=source,
+                status='pending'
+            )
+            
+            # Если есть изображение, сохраняем его
+            if 'image' in request.FILES:
+                task.image = request.FILES['image']
+                task.save()
+                
+                # Используем пробное решение, если нет подписки
+                if not has_subscription and trials_left > 0:
+                    user.use_trial()
+                    logger.info(f"Использовано пробное решение для пользователя {user.telegram_id}. Осталось: {user.trials_left}")
+                
+                # Запускаем асинхронную обработку изображения
+                process_task_image.delay(str(task.id))
+                
+                logger.info(f"Задача с изображением создана: ID={task.id}, пользователь={user.telegram_id}")
+                
+                # Отправляем сообщение пользователю через бота
+                self.send_task_received_message(user, task)
+                
+                return Response({
+                    'status': 'success',
+                    'message': 'Задача с изображением успешно создана',
+                    'task_id': task.id
+                })
+            
+            # Для текстовых задач используем OpenAI для генерации решения
+            from .tasks import generate_solution
+            import asyncio
+            
+            try:
+                # Генерируем решение с помощью OpenAI
+                solution = generate_solution(data.get('description', ''))
+                
+                # Обновляем задачу с решением
+                task.solution = solution
+                task.status = 'completed'
+                task.completed_at = timezone.now()
+                task.save()
+                
+                logger.info(f"Задача с AI решением создана: ID={task.id}, пользователь={user.telegram_id}")
+                
+            except Exception as e:
+                logger.error(f"Ошибка при генерации решения: {e}")
+                # В случае ошибки используем простое решение
+                task.solution = f"""<ol>
+<li><strong>Анализ задачи:</strong> {data.get('description', '')}</li>
+<li><strong>Применение метода:</strong> Используем соответствующий метод решения</li>
+<li><strong>Выполнение вычислений:</strong> Получаем промежуточный результат</li>
+<li><strong>Ответ:</strong> Итоговое решение задачи</li>
+</ol>"""
+                task.status = 'completed'
+                task.completed_at = timezone.now()
+                task.save()
+            
+            logger.info(f"Задача создана: ID={task.id}, пользователь={user.telegram_id}")
+            
+            # Используем пробное решение, если нет подписки
+            if not has_subscription and trials_left > 0:
+                user.use_trial()
+                logger.info(f"Использовано пробное решение для пользователя {user.telegram_id}. Осталось: {user.trials_left}")
+            
+            # Отправляем сообщение пользователю через бота
+            self.send_task_received_message(user, task)
+            
+            return Response({
+                'status': 'success',
+                'message': 'Задача успешно создана',
+                'task_id': task.id
+            })
+            
+        except Exception as e:
+            logger.error(f"Ошибка при создании задачи: {e}")
+            return Response({
+                'status': 'error',
+                'message': f'Ошибка при создании задачи: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @action(detail=True, methods=['post'])
-    def fail(self, request, pk=None):
-        """Отметить задачу как неудачную"""
-        task = self.get_object()
-        error_message = request.data.get('error_message', 'Ошибка при решении')
-        
-        task.status = 'failed'
-        task.solution = f"Ошибка: {error_message}"
-        task.save()
-        
-        serializer = TaskSerializer(task)
-        return Response(serializer.data)
+    def send_task_received_message(self, user, task):
+        """Отправка сообщения о получении задачи"""
+        try:
+            import asyncio
+            from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+            from config import BOT_TOKEN
+            
+            async def send_message():
+                bot = Bot(token=BOT_TOKEN)
+                
+                text = f"""📝 Задача получена!
+
+⏳ Обрабатываем вашу задачу..."""
+
+                keyboard = [
+                    [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                # Используем telegram_id как chat_id, если chat_id не установлен
+                chat_id = user.chat_id if user.chat_id else user.telegram_id
+                
+                # Отправляем сообщение
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=reply_markup
+                )
+                
+                logger.info(f"Сообщение о получении задачи отправлено пользователю {user.telegram_id} в чат {chat_id}")
+            
+            # Запускаем асинхронную функцию
+            asyncio.run(send_message())
+            
+        except Exception as e:
+            logger.error(f"Ошибка при отправке сообщения о получении задачи: {e}")
+
+    def send_task_completed_message(self, user, task):
+        """Отправка сообщения о завершении задачи"""
+        try:
+            import asyncio
+            from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+            from config import BOT_TOKEN, WEBAPP_URL_DEV
+            
+            async def send_message():
+                bot = Bot(token=BOT_TOKEN)
+                
+                text = f"""✅ Задача решена!
+
+📱 Посмотрите решение в мини-приложении"""
+
+                # Ссылка на WebApp с конкретной задачей
+                webapp_url = f"{WEBAPP_URL_DEV}?task_id={task.id}"
+                logger.info(f"[views.py] Создаем WebApp URL: {webapp_url}")
+                logger.info(f"[views.py] WEBAPP_URL_DEV из config: {WEBAPP_URL_DEV}")
+                
+                keyboard = [
+                    [InlineKeyboardButton("👀 Посмотреть решение", web_app=WebAppInfo(url=webapp_url))],
+                    [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                # Используем telegram_id как chat_id, если chat_id не установлен
+                chat_id = user.chat_id if user.chat_id else user.telegram_id
+                
+                # Отправляем сообщение
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=text,
+                    reply_markup=reply_markup
+                )
+                
+                logger.info(f"Сообщение о завершении задачи отправлено пользователю {user.telegram_id} в чат {chat_id}")
+            
+            # Запускаем асинхронную функцию
+            asyncio.run(send_message())
+            
+        except Exception as e:
+            logger.error(f"Ошибка при отправке сообщения о завершении задачи: {e}")
+    
+    def put(self, request):
+        """PUT метод для тестирования"""
+        return Response({'status': 'OK', 'message': 'PUT запрос получен в TaskCreateView!'})
 
 class StatsAPIView(APIView):
     """API для получения статистики"""
@@ -190,6 +385,22 @@ class UserByTelegramIDAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserTasksByTelegramIDAPIView(APIView):
+    """API для получения задач пользователя по Telegram ID"""
+    
+    def get(self, request, telegram_id):
+        """Получить задачи пользователя по Telegram ID"""
+        try:
+            user = User.objects.get(telegram_id=telegram_id)
+            tasks = Task.objects.filter(user=user).order_by('-created_at')
+            serializer = TaskSerializer(tasks, many=True)
+            return Response(serializer.data)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Пользователь не найден'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 @method_decorator(csrf_exempt, name='dispatch')
 class YooKassaWebhookView(APIView):
@@ -259,31 +470,37 @@ class YooKassaWebhookView(APIView):
     def send_success_message(self, user):
         """Отправка сообщения об успешной оплате"""
         try:
+            import asyncio
             from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
             from config import BOT_TOKEN
-            bot = Bot(token=BOT_TOKEN)
             
-            text = """✅ Подписка успешно оформлена!
+            async def send_message():
+                bot = Bot(token=BOT_TOKEN)
+                
+                text = """✅ Подписка успешно оформлена!
 
 Теперь тебе доступен безлимит на решения задач на 30 дней."""
 
-            keyboard = [
-                [InlineKeyboardButton("🧠 Решить задачу", callback_data="solve_task")],
-                [InlineKeyboardButton("🔐 Подписка", callback_data="subscription")],
-                [InlineKeyboardButton("📢 Канал", url="https://t.me/your_channel")],
-                [InlineKeyboardButton("💬 Поддержка", url="https://t.me/your_support_bot")]
-            ]
+                keyboard = [
+                    [InlineKeyboardButton("🧠 Решить задачу", callback_data="solve_task")],
+                    [InlineKeyboardButton("🔐 Подписка", callback_data="subscription")],
+                    [InlineKeyboardButton("📢 Канал", url="https://t.me/your_channel")],
+                    [InlineKeyboardButton("💬 Поддержка", url="https://t.me/your_support_bot")]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                # Отправляем сообщение
+                await bot.send_message(
+                    chat_id=user.chat_id,
+                    text=text,
+                    reply_markup=reply_markup
+                )
+                
+                logger.info(f"Сообщение об успешной оплате отправлено пользователю {user.telegram_id}")
             
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            # Отправляем сообщение синхронно
-            bot.send_message(
-                chat_id=user.chat_id,
-                text=text,
-                reply_markup=reply_markup
-            )
-            
-            logger.info(f"Сообщение об успешной оплате отправлено пользователю {user.telegram_id}")
+            # Запускаем асинхронную функцию
+            asyncio.run(send_message())
             
         except Exception as e:
             logger.error(f"Ошибка при отправке сообщения об успешной оплате: {e}")
@@ -291,32 +508,38 @@ class YooKassaWebhookView(APIView):
     def send_error_message(self, user, payment_id):
         """Отправка сообщения об ошибке оплаты"""
         try:
+            import asyncio
             from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
             from config import BOT_TOKEN
-            bot = Bot(token=BOT_TOKEN)
             
-            text = """⚠️ Сложности с оплатой.
+            async def send_message():
+                bot = Bot(token=BOT_TOKEN)
+                
+                text = """⚠️ Сложности с оплатой.
 
 Попробуйте ещё раз или выберите другой способ."""
 
-            # Ссылка на повторную оплату через YooKassa
-            retry_url = f"https://yoomoney.ru/checkout/payments/v2/contract?orderId={payment_id}"
+                # Ссылка на повторную оплату через YooKassa
+                retry_url = f"https://yoomoney.ru/checkout/payments/v2/contract?orderId={payment_id}"
+                
+                keyboard = [
+                    [InlineKeyboardButton("💳 Повторить оплату", url=retry_url)],
+                    [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
+                ]
+                
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                # Отправляем сообщение
+                await bot.send_message(
+                    chat_id=user.chat_id,
+                    text=text,
+                    reply_markup=reply_markup
+                )
+                
+                logger.info(f"Сообщение об ошибке оплаты отправлено пользователю {user.telegram_id}")
             
-            keyboard = [
-                [InlineKeyboardButton("💳 Повторить оплату", url=retry_url)],
-                [InlineKeyboardButton("🔙 Назад в меню", callback_data="back_to_menu")]
-            ]
-            
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            # Отправляем сообщение синхронно
-            bot.send_message(
-                chat_id=user.chat_id,
-                text=text,
-                reply_markup=reply_markup
-            )
-            
-            logger.info(f"Сообщение об ошибке оплаты отправлено пользователю {user.telegram_id}")
+            # Запускаем асинхронную функцию
+            asyncio.run(send_message())
             
         except Exception as e:
             logger.error(f"Ошибка при отправке сообщения об ошибке оплаты: {e}")
